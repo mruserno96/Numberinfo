@@ -1,14 +1,13 @@
+import os
 import json
 import requests
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
-# --- Configuration ---
-API_TOKEN = "8282816055:AAHib5kGD1cy7fEzKjLZUMkHEh5WBBX8kA0"   # Replace with your bot token
-LEAKOSINT_API_TOKEN = "7900116525:hn41NJ2G"  # Replace with your API token
-LEAKOSINT_API_URL = "https://leakosintapi.com/"
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+LEAKOSINT_API_TOKEN = os.getenv("LEAKOSINT_API_TOKEN")
+LEAKOSINT_API_URL = os.getenv("LEAKOSINT_API_URL", "https://leakosintapi.com/")
 
-# --- API Function ---
 def query_leakosint(query: str):
     payload = {
         "token": LEAKOSINT_API_TOKEN,
@@ -18,35 +17,33 @@ def query_leakosint(query: str):
         "type": "json"
     }
     try:
-        response = requests.post(LEAKOSINT_API_URL, json=payload, timeout=15)
-        response.raise_for_status()
-        return response.json()
+        r = requests.post(LEAKOSINT_API_URL, json=payload, timeout=20)
+        r.raise_for_status()
+        return r.json()
     except Exception as e:
         return {"error": str(e)}
 
-# --- Bot Handlers ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Welcome to LeakOSINT Scanner Bot!\nSend me a query to search leaks.")
+    await update.message.reply_text("🔎 LeakOSINT Scanner\nSend a query to search leaks.")
 
 async def handle_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_query = update.message.text.strip()
-    await update.message.reply_text(f"Scanning for: {user_query} ...")
-    
-    result = query_leakosint(user_query)
-    formatted = json.dumps(result, indent=2)
-    
-    # Telegram messages have a size limit, so truncate if too large
-    if len(formatted) > 4000:
-        formatted = formatted[:4000] + "\n\n[Output truncated]"
-    
-    await update.message.reply_text(f"Results:\n{formatted}")
+    q = (update.message.text or "").strip()
+    if not q:
+        return await update.message.reply_text("Send a non-empty query.")
+    await update.message.reply_text(f"Scanning for: `{q}` …", parse_mode="Markdown")
+    result = query_leakosint(q)
+    text = json.dumps(result, indent=2)
+    if len(text) > 3900:
+        text = text[:3900] + "\n\n[truncated]"
+    await update.message.reply_text(f"```\n{text}\n```", parse_mode="Markdown")
 
-# --- Main ---
-if __name__ == "__main__":
-    app = ApplicationBuilder().token(API_TOKEN).build()
-
+def main():
+    if not TELEGRAM_BOT_TOKEN or not LEAKOSINT_API_TOKEN:
+        raise RuntimeError("Missing TELEGRAM_BOT_TOKEN or LEAKOSINT_API_TOKEN env vars.")
+    app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_query))
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
 
-    print("Bot running...")
-    app.run_polling()
+if __name__ == "__main__":
+    main()
