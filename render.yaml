@@ -4,7 +4,7 @@ services:
     env: python
     plan: starter
     buildCommand: pip install -r requirements.txt
-    startCommand: python main.py
+    startCommand: python bot.py
     envVars:
       - key: TELEGRAM_BOT_TOKEN
         sync: false
@@ -12,3 +12,7 @@ services:
         sync: false
       - key: WEBHOOK_PATH
         value: /webhook
+      - key: UPI_ID
+        value: your-upi@bank
+      - key: ADMIN_IDS
+        value: ""   # comma separated admin telegram ids, e.g. "12345678,23456789"
